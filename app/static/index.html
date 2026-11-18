@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automated Invoice & Ticket Processing Agent | Power Automate & AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="branding">
+        <div class="logo-badge">⚡</div>
+        <div class="title-group">
+          <h1>Automated Invoice & Ticket Processing Agent</h1>
+          <p>Microsoft Power Automate + AI Builder + Dataverse + Office 365 Architecture</p>
+        </div>
+      </div>
+      <div class="status-pills">
+        <div class="pill">
+          <span class="pill-dot"></span>
+          <span>Engine Active</span>
+        </div>
+        <a href="/docs" target="_blank" class="pill" style="text-decoration: none; color: inherit;">
+          <span>📘 API Docs (Swagger)</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs-container">
+      <button class="tab-btn active" data-tab="tab-simulator">Extraction & Routing Sandbox</button>
+      <button class="tab-btn" data-tab="tab-audit">Dataverse / Audit Records</button>
+      <button class="tab-btn" data-tab="tab-expressions">Power Automate Expressions & Schemas</button>
+    </nav>
+
+    <!-- Tab 1: Simulator & Extraction -->
+    <main id="tab-simulator" class="tab-pane active">
+      <div class="dashboard-grid">
+        <!-- Left: Upload & Input -->
+        <section class="glass-card">
+          <div class="card-title-bar">
+            <h2>📄 Document Ingestion</h2>
+            <span id="engineBadge" class="confidence-chip" style="background: rgba(99,102,241,0.15); color: #a5b4fc;">Dual-Engine Ready</span>
+          </div>
+
+          <div id="dropzone" class="dropzone-container">
+            <div class="drop-icon">📥</div>
+            <div class="dropzone-text">Drag & drop Invoice / Ticket file here</div>
+            <div class="dropzone-sub">Supports PDF, PNG, JPEG, TIFF (Max 25MB)</div>
+            <input type="file" id="fileInput" class="file-input" accept=".pdf,.png,.jpg,.jpeg">
+          </div>
+
+          <div class="sample-bar">
+            <span>Load Quick Pre-built Test Cases:</span>
+            <div class="sample-buttons">
+              <button class="btn-sample" data-sample="happy_low">1. Low Value ($450 - Auto-Approved)</button>
+              <button class="btn-sample" data-sample="high_val">2. High Value ($4,850 - Approval Req.)</button>
+              <button class="btn-sample" data-sample="inr_high">3. INR Invoice (₹125,000 - Approval Req.)</button>
+              <button class="btn-sample" data-sample="low_conf">4. Blurry / Missing Total (Flagged)</button>
+            </div>
+          </div>
+
+          <div id="fileInfoBox" class="doc-preview-meta" style="display: none;">
+            <div>
+              <strong id="infoFileName">invoice.pdf</strong>
+              <div id="infoFileSize" style="color: var(--text-dim); font-size: 0.75rem;">124 KB</div>
+            </div>
+            <span id="uploadSpinner" class="spinner" style="display: none;"></span>
+          </div>
+
+          <div style="margin-top: 24px;">
+            <div class="field-label">OCR / Extracted Raw Text Stream</div>
+            <div id="rawTextContainer" class="code-container" style="max-height: 180px; overflow-y: auto;">
+              Upload a document or choose a sample to inspect the text stream...
+            </div>
+          </div>
+        </section>
+
+        <!-- Right: AI Extraction & Routing Simulation -->
+        <section class="glass-card">
+          <div class="card-title-bar">
+            <h2>🤖 AI Builder Extraction & Business Routing</h2>
+            <div id="confidenceBadge" class="confidence-chip" style="background: rgba(255,255,255,0.05);">Confidence: --</div>
+          </div>
+
+          <!-- Business Routing Banner -->
+          <div id="routingBanner" class="routing-banner auto-approved">
+            <div class="routing-info">
+              <h3 id="routingStatusTitle">🟢 Auto-Approved (Within Threshold)</h3>
+              <p id="routingStatusReason">Amount is within normal operational threshold. Processed directly to database.</p>
+            </div>
+            <div id="routingActions" class="routing-actions" style="display: none;">
+              <button id="btnApprove" class="btn-action btn-approve">✓ Approve</button>
+              <button id="btnReject" class="btn-action btn-reject">✕ Reject</button>
+            </div>
+          </div>
+
+          <!-- Extracted Fields Grid -->
+          <div class="field-grid">
+            <div class="field-box">
+              <div class="field-label">Vendor / Customer Name</div>
+              <div id="fieldVendor" class="field-value">Acme Cloud Solutions Inc.</div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">Invoice / Ticket ID</div>
+              <div id="fieldInvoiceId" class="field-value">INV-2026-9812</div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">Invoice Date (ISO 8601)</div>
+              <div id="fieldDate" class="field-value">2026-10-12</div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">Total Amount & Currency</div>
+              <div id="fieldAmount" class="field-value amount">$450.00</div>
+            </div>
+          </div>
+
+          <!-- Itemized Line Items Table -->
+          <div class="card-title-bar" style="margin-bottom: 12px;">
+            <h2 style="font-size: 0.95rem;">📦 Itemized Line Items</h2>
+            <span id="lineItemCount" style="font-size: 0.75rem; color: var(--text-dim);">1 item detected</span>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th>Unit Rate</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody id="lineItemsTableBody">
+                <tr>
+                  <td>Cloud Infrastructure Tier 1</td>
+                  <td>1</td>
+                  <td>$450.00</td>
+                  <td>$450.00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Save to Database Simulation Button -->
+          <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+            <button id="btnSaveAudit" class="btn-action btn-approve" style="background: var(--accent-primary);">
+              💾 Save Record to Database (Dataverse Sync)
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Tab 2: Audit Trail & Dataverse View -->
+    <main id="tab-audit" class="tab-pane">
+      <section class="glass-card">
+        <div class="card-title-bar">
+          <h2>🗄️ Invoices Processed Audit Table (Dataverse Mirror)</h2>
+          <button id="btnRefreshAudit" class="btn-sample">🔄 Refresh Table</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
+          Mirrors the <code>cr_invoices_processed</code> Dataverse entity and Excel Online tracker.
+        </p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Invoice ID</th>
+                <th>Vendor Name</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Confidence</th>
+                <th>Approval Remarks</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              <tr>
+                <td colspan="9" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                  Loading audit logs...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Tab 3: Power Automate Expressions & Schemas -->
+    <main id="tab-expressions" class="tab-pane">
+      <section class="glass-card">
+        <div class="card-title-bar">
+          <h2>⚡ Power Automate Workflow Definition Reference</h2>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">
+          Direct copy-paste WDL expressions, trigger conditions, and schemas for Power Automate deployment.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <div>
+            <div class="field-label">1. Trigger Condition (Settings > Trigger Conditions on 'When a new email arrives (V3)')</div>
+            <div class="code-container">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+<pre>@and(
+  greater(length(triggerOutputs()?['body/attachments']), 0),
+  or(
+    contains(toLower(triggerOutputs()?['body/subject']), 'invoice'),
+    contains(toLower(triggerOutputs()?['body/subject']), 'bill'),
+    contains(toLower(triggerOutputs()?['body/subject']), 'service request')
+  )
+)</pre>
+            </div>
+          </div>
+
+          <div>
+            <div class="field-label">2. Attachment Format & Signature Filter (Inside 'Apply to each attachment')</div>
+            <div class="code-container">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+<pre>@and(
+  or(
+    endsWith(toLower(items('Apply_to_each_attachment')?['name']), '.pdf'),
+    endsWith(toLower(items('Apply_to_each_attachment')?['name']), '.png'),
+    endsWith(toLower(items('Apply_to_each_attachment')?['name']), '.jpeg'),
+    endsWith(toLower(items('Apply_to_each_attachment')?['name']), '.jpg')
+  ),
+  greater(items('Apply_to_each_attachment')?['size'], 10240)
+)</pre>
+            </div>
+          </div>
+
+          <div>
+            <div class="field-label">3. Total Amount Cleaning WDL Expression (Strips symbols, commas, handles nulls)</div>
+            <div class="code-container">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+<pre>if(
+  empty(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceTotal/value']),
+  0.0,
+  float(
+    replace(
+      replace(
+        replace(
+          replace(
+            string(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceTotal/value']),
+            '$', ''
+          ),
+          '₹', ''
+        ),
+        '€', ''
+      ),
+      ',', ''
+    )
+  )
+)</pre>
+            </div>
+          </div>
+
+          <div>
+            <div class="field-label">4. HTTP Action Payload Schema (When using the FastAPI Fallback Engine)</div>
+            <div class="code-container">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+<pre>{
+  "type": "object",
+  "properties": {
+    "vendor_name": { "type": "string" },
+    "invoice_id": { "type": "string" },
+    "invoice_date": { "type": "string" },
+    "total_amount": { "type": "number" },
+    "currency": { "type": "string" },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unit_price": { "type": "number" },
+          "amount": { "type": "number" }
+        }
+      }
+    },
+    "confidence_score": { "type": "number" },
+    "extraction_engine": { "type": "string" }
+  }
+}</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

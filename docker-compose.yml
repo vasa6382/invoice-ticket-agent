@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  invoice-agent:
+    build: .
+    container_name: invoice-automation-agent
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=Enterprise Invoice & Ticket Automation Engine
+      - THRESHOLD_USD=1000.0
+      - THRESHOLD_INR=50000.0
+      - INVOICE_API_KEY=powerautomate-secret-token-2026
+    volumes:
+      - ./invoices_audit.db:/app/invoices_audit.db
+      - ./sample_data:/app/sample_data
+    restart: unless-stopped

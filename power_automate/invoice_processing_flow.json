@@ -1,0 +1,301 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "When_a_new_email_arrives_(V3)": {
+      "type": "OpenApiConnectionNotification",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_office365",
+          "operationId": "OnNewEmailV3",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+        },
+        "parameters": {
+          "folderPath": "Inbox",
+          "hasAttachments": true,
+          "includeAttachments": true
+        }
+      },
+      "conditions": [
+        {
+          "expression": "@and(greater(length(triggerOutputs()?['body/attachments']), 0), or(contains(toLower(triggerOutputs()?['body/subject']), 'invoice'), contains(toLower(triggerOutputs()?['body/subject']), 'bill'), contains(toLower(triggerOutputs()?['body/subject']), 'service request')))"
+        }
+      ]
+    }
+  },
+  "actions": {
+    "Initialize_varThreshold": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "varThreshold",
+            "type": "float",
+            "value": 1000.0
+          }
+        ]
+      },
+      "runAfter": {}
+    },
+    "Initialize_varProcessedStatus": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "varProcessedStatus",
+            "type": "string",
+            "value": "Pending"
+          }
+        ]
+      },
+      "runAfter": {
+        "Initialize_varThreshold": ["Succeeded"]
+      }
+    },
+    "Scope_-_Try": {
+      "type": "Scope",
+      "actions": {
+        "Apply_to_each_attachment": {
+          "type": "Foreach",
+          "foreach": "@triggerOutputs()?['body/attachments']",
+          "actions": {
+            "Condition_-_Is_Supported_Document": {
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "or": [
+                      { "equals": ["@endsWith(toLower(items('Apply_to_each_attachment')?['name']), '.pdf')", true] },
+                      { "equals": ["@endsWith(toLower(items('Apply_to_each_attachment')?['name']), '.png')", true] },
+                      { "equals": ["@endsWith(toLower(items('Apply_to_each_attachment')?['name']), '.jpeg')", true] },
+                      { "equals": ["@endsWith(toLower(items('Apply_to_each_attachment')?['name']), '.jpg')", true] }
+                    ]
+                  },
+                  {
+                    "greater": ["@items('Apply_to_each_attachment')?['size']", 10240]
+                  }
+                ]
+              },
+              "actions": {
+                "Get_Attachment_(V2)": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365",
+                      "operationId": "GetAttachmentV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "messageId": "@triggerOutputs()?['body/id']",
+                      "attachmentId": "@items('Apply_to_each_attachment')?['id']"
+                    }
+                  }
+                },
+                "Extract_information_from_invoices": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "PredictInvoiceV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "invoiceFile": "@body('Get_Attachment_(V2)')?['contentBytes']"
+                    }
+                  },
+                  "runAfter": {
+                    "Get_Attachment_(V2)": ["Succeeded"]
+                  }
+                },
+                "Condition_-_Needs_Approval": {
+                  "type": "If",
+                  "expression": {
+                    "or": [
+                      {
+                        "greater": [
+                          "@if(empty(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceTotal/value']), 0.0, float(replace(replace(replace(replace(string(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceTotal/value']), '$', ''), '₹', ''), '€', ''), ',', '')))",
+                          "@variables('varThreshold')"
+                        ]
+                      },
+                      {
+                        "less": [
+                          "@float(coalesce(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceTotal/confidence'], 0.0))",
+                          0.65
+                        ]
+                      }
+                    ]
+                  },
+                  "actions": {
+                    "Start_and_wait_for_an_approval_(V2)": {
+                      "type": "OpenApiConnectionWebhook",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_approvals",
+                          "operationId": "StartAndWaitForAnApprovalV2",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals"
+                        },
+                        "parameters": {
+                          "approvalType": "Basic",
+                          "title": "Invoice Approval Required: @{coalesce(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/VendorName/value'], 'Unknown Vendor')}",
+                          "assignedTo": "finance-manager@yourdomain.com",
+                          "details": "High-value or flagged invoice processed.\nAmount: @{outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceTotal/value']}"
+                        }
+                      }
+                    },
+                    "Condition_-_Approval_Outcome": {
+                      "type": "If",
+                      "expression": {
+                        "equals": [
+                          "@body('Start_and_wait_for_an_approval_(V2)')?['outcome']",
+                          "Approve"
+                        ]
+                      },
+                      "actions": {
+                        "Set_Status_Approved": {
+                          "type": "SetVariable",
+                          "inputs": {
+                            "name": "varProcessedStatus",
+                            "value": "Approved"
+                          }
+                        },
+                        "Dataverse_-_Add_Approved_Row": {
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "CreateRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "cr_invoices_processeds",
+                              "item/cr_invoiceid": "@{coalesce(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceId/value'], concat('GEN-', formatDateTime(utcNow(), 'yyyyMMddHHmmss')))}",
+                              "item/cr_vendorname": "@{coalesce(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/VendorName/value'], 'Unknown Vendor')}",
+                              "item/cr_status": "@{variables('varProcessedStatus')}"
+                            }
+                          },
+                          "runAfter": {
+                            "Set_Status_Approved": ["Succeeded"]
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Set_Status_Rejected": {
+                            "type": "SetVariable",
+                            "inputs": {
+                              "name": "varProcessedStatus",
+                              "value": "Rejected"
+                            }
+                          },
+                          "Send_Rejection_Email": {
+                            "type": "OpenApiConnection",
+                            "inputs": {
+                              "host": {
+                                "connectionName": "shared_office365",
+                                "operationId": "SendEmailV2",
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                              },
+                              "parameters": {
+                                "emailMessage/To": "@triggerOutputs()?['body/from']",
+                                "emailMessage/Subject": "Invoice Rejected: @{coalesce(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceId/value'], 'Your Invoice')}",
+                                "emailMessage/Body": "<p>Your invoice was not approved by the finance team. Comments: @{body('Start_and_wait_for_an_approval_(V2)')?['responses'][0]?['comments']}</p>"
+                              }
+                            },
+                            "runAfter": {
+                              "Set_Status_Rejected": ["Succeeded"]
+                            }
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Start_and_wait_for_an_approval_(V2)": ["Succeeded"]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Set_Status_AutoApproved": {
+                        "type": "SetVariable",
+                        "inputs": {
+                          "name": "varProcessedStatus",
+                          "value": "Auto-Approved"
+                        }
+                      },
+                      "Dataverse_-_Add_AutoApproved_Row": {
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "CreateRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "cr_invoices_processeds",
+                            "item/cr_invoiceid": "@{coalesce(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/InvoiceId/value'], concat('GEN-', formatDateTime(utcNow(), 'yyyyMMddHHmmss')))}",
+                            "item/cr_vendorname": "@{coalesce(outputs('Extract_information_from_invoices')?['body/responsev2/predictionOutput/labels/VendorName/value'], 'Unknown Vendor')}",
+                            "item/cr_status": "@{variables('varProcessedStatus')}"
+                          }
+                        },
+                        "runAfter": {
+                          "Set_Status_AutoApproved": ["Succeeded"]
+                        }
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Extract_information_from_invoices": ["Succeeded"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Initialize_varProcessedStatus": ["Succeeded"]
+      }
+    },
+    "Scope_-_Catch": {
+      "type": "Scope",
+      "actions": {
+        "Send_Admin_Alert_Email": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+            },
+            "parameters": {
+              "emailMessage/To": "admin-it@yourdomain.com",
+              "emailMessage/Subject": "ALERT: Automated Invoice Flow Failed",
+              "emailMessage/Body": "<p>An unhandled error occurred in the Invoice Processing Flow.<br>Trigger Email ID: @{triggerOutputs()?['body/id']}<br>Sender: @{triggerOutputs()?['body/from']}</p>"
+            }
+          }
+        },
+        "Terminate_Failed": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Failed",
+            "runError": {
+              "code": "InvoiceProcessingFailure",
+              "message": "Scope - Try execution failed or timed out."
+            }
+          },
+          "runAfter": {
+            "Send_Admin_Alert_Email": ["Succeeded", "Failed", "Skipped"]
+          }
+        }
+      },
+      "runAfter": {
+        "Scope_-_Try": ["Failed", "TimedOut", "Skipped"]
+      }
+    }
+  }
+}

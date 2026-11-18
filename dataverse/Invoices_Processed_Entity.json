@@ -1,0 +1,103 @@
+{
+  "Entity": {
+    "LogicalName": "cr_invoices_processed",
+    "SchemaName": "cr_invoices_processed",
+    "DisplayName": "Invoices Processed",
+    "DisplayCollectionName": "Invoices Processed",
+    "Description": "Tracks all automated and approved invoice/ticket processing requests.",
+    "OwnershipType": "UserOwned",
+    "Attributes": [
+      {
+        "LogicalName": "cr_invoiceid",
+        "SchemaName": "cr_invoiceid",
+        "DisplayName": "Invoice ID",
+        "Type": "String",
+        "MaxLength": 100,
+        "IsPrimaryAttribute": true,
+        "Required": true
+      },
+      {
+        "LogicalName": "cr_vendorname",
+        "SchemaName": "cr_vendorname",
+        "DisplayName": "Vendor Name",
+        "Type": "String",
+        "MaxLength": 250,
+        "Required": true
+      },
+      {
+        "LogicalName": "cr_invoicedate",
+        "SchemaName": "cr_invoicedate",
+        "DisplayName": "Invoice Date",
+        "Type": "DateTime",
+        "Format": "DateOnly",
+        "Required": true
+      },
+      {
+        "LogicalName": "cr_totalamount",
+        "SchemaName": "cr_totalamount",
+        "DisplayName": "Total Amount",
+        "Type": "Decimal",
+        "Precision": 2,
+        "MinValue": 0.0,
+        "MaxValue": 100000000.0,
+        "Required": true
+      },
+      {
+        "LogicalName": "cr_currency",
+        "SchemaName": "cr_currency",
+        "DisplayName": "Currency Code",
+        "Type": "String",
+        "MaxLength": 10,
+        "Required": true,
+        "DefaultValue": "USD"
+      },
+      {
+        "LogicalName": "cr_status",
+        "SchemaName": "cr_status",
+        "DisplayName": "Processing Status",
+        "Type": "Picklist",
+        "Options": [
+          { "Value": 100000000, "Label": "Auto-Approved" },
+          { "Value": 100000001, "Label": "Approved" },
+          { "Value": 100000002, "Label": "Pending Approval" },
+          { "Value": 100000003, "Label": "Rejected" },
+          { "Value": 100000004, "Label": "Flagged - Low Confidence" }
+        ],
+        "Required": true
+      },
+      {
+        "LogicalName": "cr_confidencescore",
+        "SchemaName": "cr_confidencescore",
+        "DisplayName": "AI Confidence Score",
+        "Type": "Decimal",
+        "Precision": 4,
+        "Required": false
+      },
+      {
+        "LogicalName": "cr_senderemail",
+        "SchemaName": "cr_senderemail",
+        "DisplayName": "Sender Email",
+        "Type": "String",
+        "Format": "Email",
+        "MaxLength": 200,
+        "Required": false
+      },
+      {
+        "LogicalName": "cr_approvalremarks",
+        "SchemaName": "cr_approvalremarks",
+        "DisplayName": "Approval Remarks",
+        "Type": "Memo",
+        "MaxLength": 2000,
+        "Required": false
+      },
+      {
+        "LogicalName": "cr_lineitemsjson",
+        "SchemaName": "cr_lineitemsjson",
+        "DisplayName": "Line Items Raw JSON",
+        "Type": "Memo",
+        "MaxLength": 10000,
+        "Required": false
+      }
+    ]
+  }
+}
